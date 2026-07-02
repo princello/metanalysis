@@ -27,7 +27,11 @@ class MetaResult:
     k : number of studies
     estimate, se : pooled effect and its standard error
     ci_low, ci_high, level : confidence interval and its coverage
-    z, pval : Wald test of the pooled effect against zero
+    test : {"z", "knha"} inference used for the CI and effect test. "z" is the
+        normal Wald test; "knha" is the Hartung-Knapp-Sidik-Jonkman adjustment
+        (random-effects only), which scales the SE and uses a t(k-1) reference.
+    z, pval : test of the pooled effect against zero (normal for "z", t(k-1)
+        for "knha"; the ``z`` field carries the t statistic in that case)
     Q, Q_df, Q_pval : Cochran's heterogeneity test
     I2 : proportion of total variation due to heterogeneity (0-1)
     H2 : Q / df
@@ -43,6 +47,7 @@ class MetaResult:
     ci_low: float
     ci_high: float
     level: float
+    test: str
     z: float
     pval: float
     Q: float
@@ -62,12 +67,15 @@ class MetaResult:
         name = {"FE": "Fixed-effect", "DL": "Random-effects (DL)",
                 "REML": "Random-effects (REML)"}[self.method]
         pct = int(round(self.level * 100))
+        hk = "  (HK)" if self.test == "knha" else ""
+        stat = "t" if self.test == "knha" else "z"
         lines = [
             f"{name} meta-analysis  (k = {self.k} studies)",
             f"  Pooled estimate : {self.estimate:.4f}  "
             f"(SE {self.se:.4f})",
-            f"  {pct}% CI          : [{self.ci_low:.4f}, {self.ci_high:.4f}]",
-            f"  Test of effect  : z = {self.z:.3f},  p = {self.pval:.3g}",
+            f"  {pct}% CI          : "
+            f"[{self.ci_low:.4f}, {self.ci_high:.4f}]{hk}",
+            f"  Test of effect  : {stat} = {self.z:.3f},  p = {self.pval:.3g}",
             "  Heterogeneity   : "
             f"Q({self.Q_df}) = {self.Q:.3f}, p = {self.Q_pval:.3g}; "
             f"I2 = {100 * self.I2:.1f}%; tau2 = {self.tau2:.4f}",
@@ -109,7 +117,7 @@ def _reml_tau2(yi: np.ndarray, vi: np.ndarray, tau2_init: float,
 
 
 def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
-                 level: float = 0.95) -> MetaResult:
+                 level: float = 0.95, test: str = "z") -> MetaResult:
     """Pool effect sizes across studies.
 
     Parameters
@@ -125,6 +133,14 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
         DerSimonian-Laird; "REML" random-effects restricted maximum likelihood.
     level : float
         Confidence level for intervals (default 0.95).
+    test : {"z", "knha"}
+        Inference for the confidence interval and the test of the pooled
+        effect. "z" (default) uses the normal Wald test, ``est +- z * se``.
+        "knha" applies the Hartung-Knapp-Sidik-Jonkman adjustment: it scales
+        the Wald SE by ``sqrt(q)`` and uses a ``t(k-1)`` reference, giving
+        better coverage under heterogeneity. Only valid for random-effects
+        models ("DL"/"REML") with ``k >= 2``; the point estimate, ``tau2``,
+        ``Q``, ``I2`` and the prediction interval are unaffected.
 
     Returns
     -------
@@ -133,6 +149,10 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
     method = method.upper()
     if method not in VALID_METHODS:
         raise ValueError(f"method must be one of {VALID_METHODS}, got {method!r}")
+
+    test = test.lower()
+    if test not in ("z", "knha"):
+        raise ValueError(f"test must be 'z' or 'knha', got {test!r}")
 
     yi = np.asarray(yi, dtype=float)
     if sei is None and vi is None:
@@ -151,6 +171,12 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
 
     k = yi.size
     df = k - 1
+
+    if test == "knha" and (method == "FE" or k < 2):
+        raise ValueError(
+            "test='knha' requires a random-effects model ('DL' or 'REML') "
+            f"with k >= 2; got method={method!r}, k={k}"
+        )
 
     # Fixed-effect (inverse-variance) weights drive the heterogeneity stats.
     wf = 1.0 / vi
@@ -183,19 +209,30 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
     w = 1.0 / (vi + tau2)
     sw = w.sum()
     estimate = float((w * yi).sum() / sw)
-    se = float(np.sqrt(1.0 / sw))
+    se_wald = float(np.sqrt(1.0 / sw))
 
-    zc = float(stats.norm.ppf(0.5 + level / 2))
-    ci_low = estimate - zc * se
-    ci_high = estimate + zc * se
+    if test == "knha":
+        # Hartung-Knapp-Sidik-Jonkman: scale the Wald SE by sqrt(q) (q is the
+        # weighted residual mean square) and refer to a t(k-1) distribution.
+        q = float((w * (yi - estimate) ** 2).sum() / df)
+        se = se_wald * float(np.sqrt(q))
+        crit = float(stats.t.ppf(0.5 + level / 2, df=df))
+        z = estimate / se
+        pval = float(2 * stats.t.sf(abs(z), df=df))
+    else:
+        se = se_wald
+        crit = float(stats.norm.ppf(0.5 + level / 2))
+        z = estimate / se
+        pval = float(2 * stats.norm.sf(abs(z)))
 
-    z = estimate / se
-    pval = float(2 * stats.norm.sf(abs(z)))
+    ci_low = estimate - crit * se
+    ci_high = estimate + crit * se
 
     # Prediction interval: only meaningful for random-effects with k >= 3.
+    # Uses the (unscaled) Wald SE regardless of the CI inference method.
     if method != "FE" and k >= 3:
         tc = float(stats.t.ppf(0.5 + level / 2, df=k - 2))
-        pi_half = tc * np.sqrt(tau2 + se ** 2)
+        pi_half = tc * np.sqrt(tau2 + se_wald ** 2)
         pi_low = estimate - pi_half
         pi_high = estimate + pi_half
     else:
@@ -205,7 +242,7 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
 
     return MetaResult(
         method=method, k=k, estimate=estimate, se=se,
-        ci_low=ci_low, ci_high=ci_high, level=level,
+        ci_low=ci_low, ci_high=ci_high, level=level, test=test,
         z=z, pval=pval, Q=Q, Q_df=df, Q_pval=Q_pval,
         I2=I2, H2=H2, tau2=tau2, tau=float(np.sqrt(tau2)),
         pi_low=pi_low, pi_high=pi_high,
