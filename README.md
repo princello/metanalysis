@@ -20,6 +20,12 @@ plots.
 - **Publication bias**: Egger's regression test for funnel-plot asymmetry.
 - **Plots**: forest plot (weight-scaled markers, pooled diamond, prediction
   interval) and funnel plot (pseudo-CI cone + Egger annotation).
+- **Effect-size intake with provenance** (`convert.py`): recover `(mean, SD)`
+  from a reported median with range/IQR (Wan 2014 SD, Luo 2018 mean), and back
+  out a standard error from a CI, p-value, t-statistic, or F(1, df). Every
+  recovered number carries a `Derived` record of the raw inputs, estimator,
+  assumptions, and citation; `to_effects()` threads that lineage into the final
+  `(yi, vi)` and `extraction_log()` renders a supplementary extraction table.
 
 ## Install
 
@@ -92,8 +98,9 @@ python validation/cross_check_statsmodels.py
 
 ```
 metanalysis/
-  pooling.py   meta_analyze(), MetaResult (FE / DL / REML, Q, I², τ², PI)
+  pooling.py   meta_analyze(), MetaResult (FE / DL / REML, Q, I², τ², PI, HKSJ)
   effects.py   effect_md/smd/or/rr/rd/cor, compute_effects()
+  convert.py   median/IQR→(mean,SD) [Wan/Luo], SE recovery, Derived provenance
   bias.py      egger_test(), EggerResult
   plots.py     forest_plot(), funnel_plot()
 tests/         hand-computed unit tests
@@ -103,6 +110,10 @@ demo.py        end-to-end example on the BCG dataset
 
 ## References
 
+- Wan, Wang, Liu & Tong (2014). *Estimating the sample mean and standard
+  deviation from the sample size, median, range and/or interquartile range.*
+- Luo, Wan, Liu & Tong (2018). *Optimally estimating the sample mean from the
+  sample size, median, mid-range, and/or mid-quartile range.*
 - DerSimonian & Laird (1986). *Meta-analysis in clinical trials.*
 - Viechtbauer (2005). *Bias and efficiency of meta-analytic variance
   estimators in the random-effects model.* (REML)

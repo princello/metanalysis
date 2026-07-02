@@ -6,6 +6,21 @@ draw forest and funnel plots.
 """
 
 from .bias import EggerResult, egger_test
+from .convert import (
+    Derived,
+    DerivedEffect,
+    GroupSummary,
+    extraction_log,
+    mean_sd_from_five_number,
+    mean_sd_from_median_iqr,
+    mean_sd_from_median_range,
+    mean_sd_from_summary,
+    se_from_ci,
+    se_from_fstat,
+    se_from_pvalue,
+    se_from_tstat,
+    to_effects,
+)
 from .effects import (
     compute_effects,
     effect_cor,
@@ -32,5 +47,19 @@ __all__ = [
     "compute_effects",
     "EggerResult",
     "egger_test",
+    # effect-size intake / conversion layer
+    "Derived",
+    "GroupSummary",
+    "DerivedEffect",
+    "mean_sd_from_median_range",
+    "mean_sd_from_median_iqr",
+    "mean_sd_from_five_number",
+    "mean_sd_from_summary",
+    "se_from_ci",
+    "se_from_pvalue",
+    "se_from_tstat",
+    "se_from_fstat",
+    "to_effects",
+    "extraction_log",
 ]
 __version__ = "0.1.0"
