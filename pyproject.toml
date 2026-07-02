@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metanalysis"
+version = "0.1.0"
+description = "A general-purpose meta-analysis toolkit: fixed/random-effects pooling, effect-size computation, forest and funnel plots, Egger's test."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.22",
+    "scipy>=1.8",
+    "matplotlib>=3.5",
+]
+
+[project.optional-dependencies]
+pandas = ["pandas>=1.4"]
+test = ["pytest>=7", "pandas>=1.4", "statsmodels>=0.13"]
+
+[tool.setuptools]
+packages = ["metanalysis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
