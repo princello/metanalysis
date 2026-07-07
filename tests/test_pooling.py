@@ -184,16 +184,21 @@ def test_knha_leaves_point_estimate_tau2_and_q_unchanged():
 
 
 def test_default_test_is_z_and_unchanged_on_bcg():
-    # Regression guard: default output must be byte-for-byte the pre-HKSJ result.
+    # Regression guard: default output must match the pre-HKSJ result. The point
+    # estimate / SE / z are pure inverse-variance arithmetic (bit-reproducible),
+    # so they are pinned exactly. The CI bounds and p-value route through scipy's
+    # norm.ppf / norm.sf, whose last ULP is not portable across platforms and
+    # library versions, so those are pinned to a tight tolerance instead (a real
+    # regression would move them far more than this).
     yi, vi = _bcg_effects()
     res = meta_analyze(yi=yi, vi=vi, method="REML")
     assert res.test == "z"
     assert res.estimate == -0.714532342157376
     assert res.se == 0.17978151610327855
-    assert res.ci_low == -1.0668976388058098
-    assert res.ci_high == -0.3621670455089423
     assert res.z == -3.9744483061701446
-    assert res.pval == 7.054258100504829e-05
+    assert res.ci_low == pytest.approx(-1.0668976388058098, rel=1e-12)
+    assert res.ci_high == pytest.approx(-0.3621670455089423, rel=1e-12)
+    assert res.pval == pytest.approx(7.054258100504829e-05, rel=1e-9)
 
 
 def test_knha_works_for_dl():
