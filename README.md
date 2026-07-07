@@ -30,8 +30,9 @@ plots.
 ## Install
 
 ```bash
-cd meta_analysis
-pip install -e .           # add [pandas] or [test] for extras
+git clone https://github.com/princello/metanalysis
+cd metanalysis
+pip install -e .           # add .[pandas] or .[test] for extras
 ```
 
 Or run in place with `PYTHONPATH=. python your_script.py`.

@@ -8,6 +8,13 @@ so agreement should be to ~machine precision on effects and DL statistics.
 Run: python validation/cross_check_statsmodels.py
 """
 
+import os
+import sys
+
+# Allow running as a plain script from the repo root without installing the
+# package: put the repo root (this file's parent's parent) on sys.path.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 from statsmodels.stats.meta_analysis import (
     combine_effects,

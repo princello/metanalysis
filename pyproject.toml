@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,33 @@ version = "0.1.0"
 description = "A general-purpose meta-analysis toolkit: fixed/random-effects pooling, effect-size computation, forest and funnel plots, Egger's test."
 readme = "README.md"
 requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Zicheng Wang", email = "zw3672@gmail.com" }]
+keywords = [
+    "meta-analysis",
+    "statistics",
+    "effect-size",
+    "random-effects",
+    "forest-plot",
+    "funnel-plot",
+    "systematic-review",
+    "evidence-synthesis",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
 dependencies = [
     "numpy>=1.22",
     "scipy>=1.8",
@@ -18,8 +45,14 @@ dependencies = [
 pandas = ["pandas>=1.4"]
 test = ["pytest>=7", "pandas>=1.4", "statsmodels>=0.13"]
 
+[project.urls]
+Homepage = "https://github.com/princello/metanalysis"
+Repository = "https://github.com/princello/metanalysis"
+Issues = "https://github.com/princello/metanalysis/issues"
+
 [tool.setuptools]
 packages = ["metanalysis"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-q"
