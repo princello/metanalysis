@@ -45,6 +45,12 @@ def egger_test(yi, sei=None, vi=None) -> EggerResult:
     ``1 / sei`` by ordinary least squares. The intercept measures funnel
     asymmetry; its t-test (df = k - 2) is Egger's test. Requires k >= 3.
 
+    This is the originally-published Egger et al. (1997) linear-regression test,
+    equivalent to metafor's ``regtest(model="lm")``. metafor's *default*
+    ``regtest`` is ``model="rma"``, which accounts for residual heterogeneity
+    and gives a different (often less significant) result -- so this test will
+    match metafor only when metafor is called with ``model="lm"``.
+
     Parameters
     ----------
     yi : array-like
@@ -71,6 +77,11 @@ def egger_test(yi, sei=None, vi=None) -> EggerResult:
     x_mean = prec.mean()
     y_mean = snd.mean()
     sxx = np.sum((prec - x_mean) ** 2)
+    if sxx == 0:
+        raise ValueError(
+            "Egger's test is undefined when all standard errors are equal: "
+            "there is no precision gradient to regress against"
+        )
     sxy = np.sum((prec - x_mean) * (snd - y_mean))
     slope = sxy / sxx
     intercept = y_mean - slope * x_mean

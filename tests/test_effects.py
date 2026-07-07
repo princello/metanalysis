@@ -81,6 +81,28 @@ def test_fisher_z_correlation():
     assert vi[0] == pytest.approx(1 / (28 - 3), rel=1e-12)
 
 
+def test_effect_cor_requires_n_above_three():
+    # Fisher-z variance 1/(n-3) is inf at n=3 and NEGATIVE at n<3.
+    with pytest.raises(ValueError):
+        effect_cor(r=[0.5], n=[3])
+    with pytest.raises(ValueError):
+        effect_cor(r=[0.5], n=[2])
+
+
+def test_effect_cor_rejects_unit_or_out_of_range_correlation():
+    # arctanh(+-1) = inf and arctanh(|r|>1) = nan.
+    with pytest.raises(ValueError):
+        effect_cor(r=[1.0], n=[30])
+    with pytest.raises(ValueError):
+        effect_cor(r=[-1.5], n=[30])
+
+
+def test_effect_smd_requires_more_than_two_total():
+    # n1 + n2 == 2 -> df = 0 -> pooled SD divides by zero -> (nan, nan).
+    with pytest.raises(ValueError):
+        effect_smd(m1=[10], sd1=[2], n1=[1], m2=[8], sd2=[3], n2=[1])
+
+
 def test_effects_are_numpy_arrays():
     yi, vi = effect_md(m1=[1, 2], sd1=[1, 1], n1=[10, 10],
                        m2=[0, 0], sd2=[1, 1], n2=[10, 10])

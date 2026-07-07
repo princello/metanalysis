@@ -5,6 +5,19 @@ via DerSimonian-Laird (moment estimator) and REML (restricted maximum
 likelihood, iterative). Reports the pooled estimate with a confidence
 interval, Cochran's Q, I-squared, H-squared, tau-squared, and a
 prediction interval for random-effects models.
+
+Conventions (points where output intentionally differs from metafor)
+--------------------------------------------------------------------
+- I2 / H2 are always the Q-based Higgins-Thompson (2002) quantities,
+  ``(Q - df) / Q`` and ``Q / df``, regardless of ``method``. metafor derives
+  I2/H2 for random-effects models from the model's own tau2, so its REML I2/H2
+  will be smaller than ours; FE and DL agree exactly.
+- The prediction interval is the Higgins-Thompson-Spiegelhalter (2009) interval
+  ``estimate +- t(k-2) * sqrt(tau2 + SE^2)`` with the unscaled Wald SE. metafor
+  uses a normal (or, under knha, a t(k-1) with the scaled SE) multiplier, so
+  ours is wider; both are standard, ours matches IntHout et al. (2016).
+- Under ``test="knha"`` the CI uses the HKSJ-scaled SE and t(k-1) while the
+  prediction interval deliberately keeps the unscaled Wald SE (see below).
 """
 
 from __future__ import annotations
@@ -33,8 +46,13 @@ class MetaResult:
     z, pval : test of the pooled effect against zero (normal for "z", t(k-1)
         for "knha"; the ``z`` field carries the t statistic in that case)
     Q, Q_df, Q_pval : Cochran's heterogeneity test
-    I2 : proportion of total variation due to heterogeneity (0-1)
-    H2 : Q / df
+    I2 : proportion of total variation due to heterogeneity (0-1). This is the
+        Q-based Higgins-Thompson (2002) statistic ``(Q - df) / Q``, computed the
+        same way for every ``method``. For FE and DL it equals the
+        estimator-based form ``tau2 / (tau2 + s2)``; for REML it does NOT (REML
+        reports a different tau2), so REML I2/H2 here will differ from metafor,
+        which derives them from the model's own tau2. See the module note.
+    H2 : Q / df (Q-based, same caveat as I2).
     tau2, tau : between-study variance used for pooling, and its square root
     pi_low, pi_high : prediction interval (None for fixed effect or k < 3)
     yi, vi, weights : per-study effects, variances, and pooling weights (%)
@@ -140,7 +158,12 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
         the Wald SE by ``sqrt(q)`` and uses a ``t(k-1)`` reference, giving
         better coverage under heterogeneity. Only valid for random-effects
         models ("DL"/"REML") with ``k >= 2``; the point estimate, ``tau2``,
-        ``Q``, ``I2`` and the prediction interval are unaffected.
+        ``Q``, ``I2`` and the prediction interval are unaffected. When observed
+        heterogeneity is low the scale factor ``q`` can fall below 1, so the
+        HKSJ interval is *narrower* than the Wald one; this matches metafor's
+        plain ``test="knha"`` (the ad-hoc ``max(1, q)`` truncation of Roever,
+        Knapp & Friede 2015 is deliberately not applied). ``q == 0`` (identical
+        effects) is rejected with a clear error.
 
     Returns
     -------
@@ -154,6 +177,9 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
     if test not in ("z", "knha"):
         raise ValueError(f"test must be 'z' or 'knha', got {test!r}")
 
+    if not 0 < level < 1:
+        raise ValueError(f"level must be in the open interval (0, 1), got {level}")
+
     yi = np.asarray(yi, dtype=float)
     if sei is None and vi is None:
         raise ValueError("provide either sei or vi")
@@ -166,6 +192,12 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
         raise ValueError("yi and sei/vi must have the same length")
     if yi.ndim != 1 or yi.size == 0:
         raise ValueError("yi must be a non-empty 1-D array")
+    if not np.all(np.isfinite(yi)):
+        raise ValueError("yi contains non-finite values (nan/inf)")
+    # nan/inf slip past `vi <= 0` (nan<=0 and inf<=0 are both False), so the
+    # finiteness check must come first to avoid silent nan propagation.
+    if not np.all(np.isfinite(vi)):
+        raise ValueError("variances (sei/vi) contain non-finite values (nan/inf)")
     if np.any(vi <= 0):
         raise ValueError("all variances must be positive")
 
@@ -215,6 +247,13 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
         # Hartung-Knapp-Sidik-Jonkman: scale the Wald SE by sqrt(q) (q is the
         # weighted residual mean square) and refer to a t(k-1) distribution.
         q = float((w * (yi - estimate) ** 2).sum() / df)
+        if not np.isfinite(q) or q <= 0:
+            raise ValueError(
+                "test='knha' is undefined when there is no residual "
+                "heterogeneity: the HKSJ scaling factor q is zero (all effects "
+                "coincide given their weights), so the scaled SE and "
+                "t-statistic collapse. Use test='z' instead."
+            )
         se = se_wald * float(np.sqrt(q))
         crit = float(stats.t.ppf(0.5 + level / 2, df=df))
         z = estimate / se
@@ -229,7 +268,11 @@ def meta_analyze(yi, sei=None, vi=None, method: str = "DL",
     ci_high = estimate + crit * se
 
     # Prediction interval: only meaningful for random-effects with k >= 3.
-    # Uses the (unscaled) Wald SE regardless of the CI inference method.
+    # Higgins-Thompson-Spiegelhalter (2009): estimate +- t(k-2)*sqrt(tau2+SE^2),
+    # with the (unscaled) Wald SE regardless of the CI inference method -- so
+    # under test="knha" the CI is HKSJ-scaled but the PI is not. This keeps the
+    # PI at its published definition; note it is an intentional mismatch that
+    # metafor avoids by scaling both.
     if method != "FE" and k >= 3:
         tc = float(stats.t.ppf(0.5 + level / 2, df=k - 2))
         pi_half = tc * np.sqrt(tau2 + se_wald ** 2)

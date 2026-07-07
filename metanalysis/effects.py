@@ -44,10 +44,19 @@ def effect_smd(m1, sd1, n1, m2, sd2, n2, correct=True):
 
     Cohen's d uses the pooled within-group SD. With ``correct=True`` (default)
     Hedges' small-sample correction J is applied, yielding Hedges' g. Variance
-    follows Borenstein et al. (2009).
+    follows Borenstein et al. (2009), eq. 4.24: ``V_g = J^2 * V_d`` (the ``J^2``
+    multiplies the whole ``V_d``). metafor's default does not put ``J^2`` on the
+    ``1/n1 + 1/n2`` term, so its SMD variances run ~1-2% larger; both are
+    standard. ``J = 1 - 3/(4*df - 1)`` is Hedges' approximation to the exact
+    gamma-ratio correction (agree to ~1e-6).
     """
     m1, sd1, n1, m2, sd2, n2 = map(_arr, (m1, sd1, n1, m2, sd2, n2))
     df = n1 + n2 - 2
+    if np.any(df < 1):
+        raise ValueError(
+            "SMD requires n1 + n2 > 2 (df = n1 + n2 - 2 >= 1) so the pooled "
+            "within-group SD is defined"
+        )
     sp = np.sqrt(((n1 - 1) * sd1 ** 2 + (n2 - 1) * sd2 ** 2) / df)
     d = (m1 - m2) / sp
     vd = (n1 + n2) / (n1 * n2) + d ** 2 / (2 * (n1 + n2))
@@ -79,6 +88,12 @@ def effect_or(e1, n1, e2, n2, add=0.5):
     yi = ln(ad / bc), vi = 1/a + 1/b + 1/c + 1/d, where a/b are events/
     non-events in group 1 and c/d in group 2. Studies with any zero cell get
     ``add`` (default 0.5) added to all four cells.
+
+    The 0.5 / only-zero-studies continuity correction reproduces metafor's
+    default (``add=1/2, to="only0"``). It is the accepted default but is known
+    to be biased for sparse or unbalanced data (Sweeting et al. 2004); for many
+    zero cells consider Peto OR or exact methods. ``add=0`` opts out entirely
+    and then requires zero-cell-free data (a zero cell yields +-inf).
     """
     a, b, c, d = _cells(e1, n1, e2, n2, add)
     yi = np.log(a * d / (b * c))
@@ -121,6 +136,11 @@ def effect_cor(r, n):
     the pooled estimate with tanh for reporting.
     """
     r, n = _arr(r), _arr(n)
+    if np.any(np.abs(r) >= 1):
+        raise ValueError("correlations must satisfy -1 < r < 1 (arctanh is "
+                         "infinite at +-1)")
+    if np.any(n <= 3):
+        raise ValueError("Fisher-z variance 1/(n-3) requires n > 3")
     yi = np.arctanh(r)
     vi = 1.0 / (n - 3)
     return yi, vi

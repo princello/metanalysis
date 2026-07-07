@@ -71,3 +71,10 @@ def test_egger_accepts_variances():
     res_se = egger_test(yi=YI, sei=SEI)
     res_vi = egger_test(yi=YI, vi=[s ** 2 for s in SEI])
     assert res_vi.intercept == pytest.approx(res_se.intercept, rel=1e-12)
+
+
+def test_egger_rejects_equal_standard_errors():
+    # With no precision gradient (all sei equal) the regression has zero
+    # spread in x -> slope 0/0 = nan. Must raise, not return all-NaN.
+    with pytest.raises(ValueError):
+        egger_test(yi=[0.1, 0.2, 0.3], sei=[0.1, 0.1, 0.1])

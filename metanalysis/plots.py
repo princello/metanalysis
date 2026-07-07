@@ -155,6 +155,9 @@ def funnel_plot(result: MetaResult = None, yi=None, sei=None, ax=None,
     """
     import matplotlib.pyplot as plt
 
+    if not 0 < level < 1:
+        raise ValueError(f"level must be in the open interval (0, 1), got {level}")
+
     if result is not None:
         yi = np.asarray(result.yi, dtype=float)
         sei = np.sqrt(result.vi)

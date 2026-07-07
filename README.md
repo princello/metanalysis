@@ -77,6 +77,30 @@ expected to fall (as opposed to the CI, which bounds the *mean* effect). It is
 `estimate ± t(k-2) · sqrt(τ² + SE²)` and is reported for random-effects models
 with `k ≥ 3`.
 
+## Conventions & differences from metafor
+
+Every method matches an authoritative reference, but a few reported quantities
+follow a different (equally standard) convention than R's `metafor`, so output
+will not line up 1:1. These are choices, not errors — each is documented at its
+source:
+
+- **REML I²/H² are Q-based.** I² = (Q−df)/Q and H² = Q/df are computed the same
+  way for every method (Higgins–Thompson 2002). For FE and DL this is identical
+  to `metafor`; for **REML** `metafor` derives I²/H² from the model's own τ², so
+  its REML values are smaller. τ², the estimate, CI, and HKSJ all still match
+  `metafor` to ~1e-8.
+- **Prediction interval** uses the Higgins–Thompson–Spiegelhalter (2009)
+  `t(k−2)` interval with the unscaled Wald SE (matches IntHout 2016); `metafor`
+  uses a normal / `t(k−1)` multiplier and is narrower. Under `test="knha"` the
+  CI is HKSJ-scaled but the PI intentionally is not.
+- **HKSJ** matches `metafor`'s plain `test="knha"`; at low heterogeneity the
+  scaled SE can fall *below* the Wald SE (the `max(1,q)` ad-hoc truncation is
+  not applied). Identical effects (`q=0`) raise a clear error.
+- **SMD variance** follows Borenstein (2009) `V_g = J²·V_d`, ~1–2% smaller than
+  `metafor`'s.
+- **Egger's test** is the classic `regtest(model="lm")` variant, not `metafor`'s
+  default `model="rma"`.
+
 ## Validation
 
 The statistics are checked three ways:
@@ -89,7 +113,7 @@ The statistics are checked three ways:
   τ² 0.3132).
 
 ```bash
-pytest -q                                   # 39 tests
+pytest -q                                   # 86 tests
 python demo.py                              # runs BCG example, writes figures
 python validation/cross_check_statsmodels.py
 ```

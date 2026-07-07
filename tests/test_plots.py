@@ -57,3 +57,8 @@ def test_funnel_plot_accepts_raw_arrays():
     ax = funnel_plot(yi=YI, sei=SEI, egger=False)
     assert isinstance(ax, Axes)
     plt.close(ax.figure)
+
+
+def test_funnel_plot_rejects_invalid_level():
+    with pytest.raises(ValueError):
+        funnel_plot(yi=YI, sei=SEI, egger=False, level=1.5)

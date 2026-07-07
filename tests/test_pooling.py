@@ -216,6 +216,38 @@ def test_knha_rejected_for_single_study():
         meta_analyze(yi=[0.4], sei=[0.1], method="REML", test="knha")
 
 
+def test_knha_rejected_when_heterogeneity_is_zero():
+    # All effects identical -> residual mean square q = 0 -> HKSJ SE collapses
+    # to 0. Must raise a clear error instead of crashing (ZeroDivisionError)
+    # or fabricating p = 0.
+    with pytest.raises(ValueError):
+        meta_analyze(yi=[0.3, 0.3, 0.3], vi=[0.01, 0.02, 0.03],
+                     method="DL", test="knha")
+
+
+# ── Guards on degenerate / invalid inputs ──────────────────────────────
+def test_nonfinite_variance_is_rejected():
+    # NaN slips past `vi <= 0` (nan <= 0 is False); it must not silently
+    # produce estimate = nan.
+    with pytest.raises(ValueError):
+        meta_analyze(yi=[0.1, 0.2], vi=[0.01, float("nan")], method="FE")
+    with pytest.raises(ValueError):
+        meta_analyze(yi=[0.1, 0.2], vi=[0.01, float("inf")], method="FE")
+
+
+def test_nonfinite_effect_is_rejected():
+    with pytest.raises(ValueError):
+        meta_analyze(yi=[0.1, float("nan"), 0.5], sei=[0.1, 0.1, 0.1],
+                     method="DL")
+
+
+@pytest.mark.parametrize("bad", [-0.2, 0.0, 1.0, 1.5])
+def test_invalid_confidence_level_is_rejected(bad):
+    # level outside (0, 1) yields inverted / nan / infinite CIs if unchecked.
+    with pytest.raises(ValueError):
+        meta_analyze(yi=YI, sei=SEI, method="DL", level=bad)
+
+
 def test_invalid_test_raises():
     with pytest.raises(ValueError):
         meta_analyze(yi=YI, sei=SEI, method="REML", test="bogus")
